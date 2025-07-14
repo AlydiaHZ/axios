@@ -3,7 +3,7 @@ import {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from "./types";
-import parseHeaders from "parse-headers";
+import parseHeader from "parse-headers";
 import AxiosInterceptorManager, {
   interceptor,
 } from "./AxiosInterceptorManager";
@@ -23,14 +23,26 @@ class Axios {
     const chain: (
       | interceptor<InternalAxiosRequestConfig>
       | interceptor<AxiosResponse>
-    )[] = [{}];
+    )[] = [{ onFulfilled: this.dispatchRequest }]; // 请求的真实逻辑
 
     this.interceptors.request.interceptors.forEach((interceptor) => {
       interceptor && chain.unshift(interceptor);
     });
+    this.interceptors.response.interceptors.forEach((interceptor) => {
+      interceptor && chain.push(interceptor);
+    });
 
+    let promise: Promise<AxiosRequestConfig | AxiosResponse> =
+      Promise.resolve(config); // 构建一个每次执行后返回的 promise
+    while (chain.length) {
+      const { onFulfilled, onRejected } = chain.shift()!;
+      promise = promise.then(
+        onFulfilled as (v: AxiosRequestConfig | AxiosResponse) => any,
+        onRejected
+      );
+    }
     // 3.发送请求
-    return this.dispatchRequest(config);
+    return promise as Promise<AxiosResponse<T>>;
   }
 
   dispatchRequest<T>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
@@ -48,7 +60,6 @@ class Axios {
       }
 
       request.open(method!, url!, true);
-      request.responseType = "json";
 
       // 请求头
       if (headers) {
@@ -56,6 +67,7 @@ class Axios {
           request.setRequestHeader(key, headers[key]);
         }
       }
+      request.responseType = "json";
       request.onreadystatechange = () => {
         // 请求发送成功了, status 为 0 表示请求未发送, 请求(网络)异常
         if (request.readyState === 4 && request.status !== 0) {
@@ -65,7 +77,7 @@ class Axios {
               data: request.response || request.responseText,
               status: request.status,
               statusText: request.statusText,
-              headers: parseHeaders(request.getAllResponseHeaders()),
+              headers: parseHeader(request.getAllResponseHeaders()),
               config,
               request,
             };
@@ -78,7 +90,6 @@ class Axios {
           }
         }
       };
-
       let requestBody: null | string = null;
       // 请求体
       if (data) {
@@ -96,6 +107,15 @@ class Axios {
         reject("net::ERR_INTERNET_DISCONNECTED");
       };
 
+      // 取消请求
+      if (config.cancelToken) {
+        config.cancelToken.then((message) => {
+          request.abort();
+          reject(message);
+          // 稍后用户会调用 source.cancel() 此promise就成功了
+        });
+      }
+      
       request.send(requestBody);
     });
   }

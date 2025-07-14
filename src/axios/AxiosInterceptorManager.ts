@@ -1,8 +1,8 @@
-type OnFufilled<V> = (val: V) => V | Promise<V>;
+type OnFulfilled<V> = (val: V) => V | Promise<V>;
 type OnRejected = (err: any) => any;
 
 export interface interceptor<V> {
-  onFufilled?: OnFufilled<V>;
+  onFulfilled?: OnFulfilled<V>;
   onRejected?: OnRejected;
 }
 
@@ -10,9 +10,9 @@ export interface interceptor<V> {
 class AxiosInterceptorManager<V> {
   public interceptors: Array<interceptor<V> | null> = [];
 
-  use(onFufilled?: OnFufilled<V>, onRejected?: OnRejected): number {
+  use(onFulfilled?: OnFulfilled<V>, onRejected?: OnRejected): number {
     this.interceptors.push({
-      onFufilled,
+      onFulfilled,
       onRejected,
     });
     return this.interceptors.length - 1;

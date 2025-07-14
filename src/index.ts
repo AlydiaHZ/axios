@@ -1,16 +1,10 @@
-import axios, {
-  AxiosRequestConfig,
-  AxiosResponse,
-  InternalAxiosRequestConfig,
-} from "./axios";
-// import axios, {
-//   AxiosRequestConfig,
-//   AxiosResponse,
-//   InternalAxiosRequestConfig,
-// } from "axios";
+import axios, { AxiosRequestConfig, AxiosResponse } from "./axios";
 
 // 基础路径 访问的后台路径
 const baseURL = "http://localhost:8080";
+
+const CancelToken = axios.CancelToken;
+const source = CancelToken.source();
 
 // 发送 get 请求和 post 请求
 interface Person {
@@ -19,7 +13,6 @@ interface Person {
 }
 
 let person: Person = { name: "zs", age: 18 };
-
 // let requestConfig: AxiosRequestConfig = {
 //   url: baseURL + "/get",
 //   method: "get",
@@ -53,34 +46,35 @@ let person: Person = { name: "zs", age: 18 };
 //   },
 //   timeout: 1000,
 // };
-
 let requestConfig: AxiosRequestConfig = {
   url: baseURL + "/post",
   method: "post",
   data: person,
-  headers: {
-    "Content-Type": "application/json",
-    name: "", // 用来交给拦截器来处理
-  },
+  cancelToken: source.token,
 };
 
-// 希望在请求的时候 可以对请求参数进行处理
-axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  config.headers.name += "a";
-  return config;
-});
-axios.interceptors.request.use((config) => {
-  config.headers.name += "b";
-  return config;
-});
+// 拦截器
+// axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+//   config.headers.name += "a";
+//   return config;
+// });
+// axios.interceptors.request.use((config) => {
+//   config.headers.name += "b";
+//   return config;
+// });
+
 // 希望的返回值也是 person
 axios(requestConfig)
   .then((response: AxiosResponse<Person>) => {
+    console.log(response.data.name);
     return response.data;
   })
   .catch((error: any) => {
+    if (axios.isCancel(error)) return console.log("取消");
     console.log(error);
   });
+
+source.cancel("cancel");
 
 /**
  * 失败有几种情况?
